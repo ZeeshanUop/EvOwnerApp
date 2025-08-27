@@ -1,0 +1,71 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "com.google.gms.google-services" // For Firebase
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace "com.example.fyp_project"
+    compileSdk 35
+    ndkVersion "27.0.12077973"
+
+    defaultConfig {
+        applicationId "com.example.fyp_project"
+        minSdk 23
+        targetSdk flutter.targetSdkVersion
+        versionCode flutter.versionCode
+        versionName flutter.versionName
+
+        // Optional: enable multidex if you're using many dependencies
+        multiDexEnabled true
+
+        // Custom BuildConfig field
+        buildConfigField "String", "GOOGLE_MAPS_API_KEY",
+                "\"${project.findProperty("GOOGLE_MAPS_API_KEY") ?: "AIzaSyD-p_PCcAP6MUJSjkizdxi4vy7Jh5A1JBE"}\""
+    }
+
+    buildFeatures {
+        buildConfig true // ✅ Enable BuildConfig for custom fields
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug // Replace with release config when ready
+            shrinkResources false
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+        coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+dependencies {
+    // Firebase BoM (Bill of Materials)
+    implementation platform('com.google.firebase:firebase-bom:33.16.0')
+
+    // Firebase services
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-storage'
+
+    // Optional: Firebase Messaging or Crashlytics
+    // implementation 'com.google.firebase:firebase-messaging'
+
+    // Needed for some larger projects using multiple libraries
+    implementation 'androidx.multidex:multidex:2.0.1'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+}
