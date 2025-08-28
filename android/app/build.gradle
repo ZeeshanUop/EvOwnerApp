@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     id "com.android.application"
     id "kotlin-android"
-    id "com.google.gms.google-services" // For Firebase
+    id "com.google.gms.google-services" // Firebase
     id "dev.flutter.flutter-gradle-plugin"
+}
+
+// ------------------------ Load .env ------------------------
+def dotenv = new Properties()
+def envFile = rootProject.file('.env')
+if (envFile.exists()) {
+    envFile.withReader('UTF-8') { reader ->
+        dotenv.load(reader)
+    }
+} else {
+    println("Warning: .env file not found, using placeholder keys")
 }
 
 android {
@@ -17,21 +30,20 @@ android {
         versionCode flutter.versionCode
         versionName flutter.versionName
 
-        // Optional: enable multidex if you're using many dependencies
+        // Enable multidex if needed
         multiDexEnabled true
 
-        // Custom BuildConfig field
-        buildConfigField "String", "GOOGLE_MAPS_API_KEY",
-                "\"${project.findProperty("GOOGLE_MAPS_API_KEY") ?: "AIzaSyD-p_PCcAP6MUJSjkizdxi4vy7Jh5A1JBE"}\""
+        // Inject Google Maps API key from .env
+        resValue "string", "google_maps_api_key", dotenv['GOOGLE_MAPS_API_KEY'] ?: "YOUR_PLACEHOLDER_KEY"
     }
 
     buildFeatures {
-        buildConfig true // ✅ Enable BuildConfig for custom fields
+        buildConfig true
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug // Replace with release config when ready
+            signingConfig signingConfigs.debug // Replace with your release config
             shrinkResources false
             minifyEnabled false
         }
@@ -53,10 +65,10 @@ flutter {
 }
 
 dependencies {
-    // Firebase BoM (Bill of Materials)
-    implementation platform('com.google.firebase:firebase-bom:33.16.0')
+    // Firebase BoM
+    implementation platform('com.google.firebase:firebase-bom:34.1.0')
 
-    // Firebase services
+    // Firebase modules
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
@@ -65,7 +77,7 @@ dependencies {
     // Optional: Firebase Messaging or Crashlytics
     // implementation 'com.google.firebase:firebase-messaging'
 
-    // Needed for some larger projects using multiple libraries
+    // Multidex
     implementation 'androidx.multidex:multidex:2.0.1'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }

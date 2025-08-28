@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -75,14 +77,25 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
               elements.length > 0 &&
               elements[0]['status'] == 'OK') {
             final distanceInMeters = elements[0]['distance']['value'];
-            return distanceInMeters / 1000; // km
+            return distanceInMeters / 1000; // ✅ Road distance
           }
         }
       }
     } catch (e) {
       debugPrint("Distance Matrix API error: $e");
     }
-    return null;
+
+    // ⚡ Fallback: Straight line distance
+    const double R = 6371; // Earth radius in km
+    double dLat = (destLat - originLat) * (3.14159 / 180);
+    double dLon = (destLng - originLng) * (3.14159 / 180);
+    double a =
+        (sin(dLat / 2) * sin(dLat / 2)) +
+            cos(originLat * (3.14159 / 180)) *
+                cos(destLat * (3.14159 / 180)) *
+                (sin(dLon / 2) * sin(dLon / 2));
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return R * c; // ✅ Straight line km
   }
 
   Future<void> _loadConnectorBasedAmount() async {
@@ -128,7 +141,11 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
       );
     }
   }
-
+  void printApiKey() {
+    if (kDebugMode) {
+      debugPrint("🔑 Google Maps API Key: ${ApiKeys.googleMaps}");
+    }
+  }
   Future<void> _submitBooking() async {
     if (vehicleType == null ||
         vehicleModel == null ||
@@ -136,8 +153,18 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
         selectedDate == null ||
         selectedTime == null ||
         amount == null) {
+      // Randomized error messages
+      final messages = [
+        "Please fill all the fields",
+        "Please fill all the field",
+      ];
+      final randomMessage = (messages..shuffle()).first;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
+        SnackBar(
+          content: Text(randomMessage),
+          backgroundColor: Colors.red.shade600,
+        ),
       );
       return;
     }
@@ -151,6 +178,11 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
     );
 
     try {
+      // Processing snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Processing your booking...")),
+      );
+
       final stationDoc = await FirebaseFirestore.instance
           .collection('ev_stations')
           .doc(widget.stationId)
@@ -210,7 +242,10 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load station info: $e')),
+        SnackBar(
+          content: Text("Booking failed: $e"),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -220,7 +255,7 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar:PreferredSize(
+      appBar: PreferredSize(
         preferredSize: const Size.fromHeight(120), // taller height
         child: AppBar(
           elevation: 0,
@@ -241,7 +276,6 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
               ),
               child: Stack(
                 children: [
-                  // Decorative wave effect
                   Positioned(
                     bottom: -30,
                     left: -40,
@@ -266,7 +300,6 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
                       ),
                     ),
                   ),
-                  // Title row
                   Align(
                     alignment: Alignment.center,
                     child: Row(
@@ -292,10 +325,8 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
           ),
           centerTitle: true,
         ),
-      )
-      ,
-
-        body: ListView(
+      ),
+      body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (widget.stationImageUrl != null &&
@@ -416,37 +447,36 @@ class _EvBookingScreenState extends State<EvBookingScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Charge Level (%)",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              Slider.adaptive(
-                value: chargePercentage,
-                min: 10,
-                max: 100,
-                divisions: 9,
-                label: "${chargePercentage.toInt()}%",
-                activeColor: Colors.green.shade700,
-                onChanged: (value) {
-                  setState(() {
-                    chargePercentage = value;
-                    amount = null;
-                  });
-                  _loadConnectorBasedAmount();
-                },
-              ),
-              const SizedBox(height: 12),
-              amount == null
-                  ? const Text("Calculating price...",
-                  style: TextStyle(color: Colors.grey))
-                  : Text("💰 Estimated Price: PKR ${amount!.toStringAsFixed(0)}",
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.green)),
-            ]),
+        child:
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text("Charge Level (%)",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 8),
+          Slider.adaptive(
+            value: chargePercentage,
+            min: 10,
+            max: 100,
+            divisions: 9,
+            label: "${chargePercentage.toInt()}%",
+            activeColor: Colors.green.shade700,
+            onChanged: (value) {
+              setState(() {
+                chargePercentage = value;
+                amount = null;
+              });
+              _loadConnectorBasedAmount();
+            },
+          ),
+          const SizedBox(height: 12),
+          amount == null
+              ? const Text("Calculating price...",
+              style: TextStyle(color: Colors.grey))
+              : Text("💰 Estimated Price: PKR ${amount!.toStringAsFixed(0)}",
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green)),
+        ]),
       ),
     );
   }
